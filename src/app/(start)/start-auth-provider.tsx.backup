@@ -1,0 +1,50 @@
+"use client";
+
+import Loading from "@/components/loading";
+import useAuth from "@/hooks/useAuth";
+import sessionStore from "@/stores/session-store";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+export default function StartAuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { token, isConfigured } = sessionStore();
+  const router = useRouter();
+  const [hydrated, setHydrated] = useState(false);
+  const { loading, user } = useAuth();
+
+  // useEffect(() => {
+  //   if (token !== undefined && isConfigured !== undefined) {
+  //     setInitialLoad(false);
+  //   }
+  // }, [token, isConfigured]);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      if (!token) {
+        router.push("/login");
+      }
+
+      if (token && isConfigured) {
+        router.push("/interactions");
+        return;
+      }
+    }
+  }, [user, token, hydrated]);
+
+  console.table({ user: !!user, hydrated: !!hydrated });
+  console.log("RENDER LOADING VIEW: ", !user || !hydrated);
+
+  if (!user || !hydrated) {
+    return <Loading />;
+  }
+
+  return <>{children}</>;
+}

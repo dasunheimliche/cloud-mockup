@@ -1,0 +1,337 @@
+"use client";
+
+// React and related hooks
+import { useEffect, useState, useRef, useCallback } from "react";
+
+// External libraries
+import axios from "axios";
+
+// Types
+import { ChargerType } from "@/lib/types";
+
+// Custom hooks
+import useAuth from "@/hooks/useAuth";
+
+// Store
+import useLangStore from "@/stores/lang-store";
+
+// Utils and API
+import { cn } from "@/lib/utils";
+import oldApi from "@/lib/old-api";
+
+// Translations
+import t from "@/translations/chargers";
+
+// Components
+import PageHeader from "@/components/page-header";
+import { Toaster } from "@/components/ui/toaster";
+import ModalTrigger from "@/components/ui/modal-trigguer";
+import { SwitchButton } from "@/components/switch-button";
+import DeleteAlertModal from "@/components/delete-alert-modal";
+import PingLost from "@/components/ping-lost";
+
+// Local components
+import Charger from "./components/charger";
+import AddChargerForm from "./components/add-charger-form";
+import EditChargerForm from "./components/edit-charger-form";
+import TooltipColors from "./components/tooltip-colors";
+import AddExcelButton from "./components/add-excel-button";
+import AddChargerButton from "./components/add-charger-button";
+import { MobileDropdownMenu } from "./components/mobile-dropdown";
+import CloneChargerForm from "./components/clone-charger-form";
+// import { useQuery } from "@tanstack/react-query";
+// import usePingChecker from "@/hooks/usePingChecker";
+// import { AUTH_URL } from "@/lib/config";
+
+// const POLLING_INTERVAL = 500;
+
+export default function DashboardPage() {
+  const [chargers, setChargers] = useState<any>([]); // ELIMINAR
+  const [onlyOnline, setOnlyOnline] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true); // ELIMINAR
+  const [loadingRequest, setLoadingRequest] = useState<boolean>(true); // ELIMINAR
+  const [selectedValues, setSelectedValues] = useState<ChargerType | null>(
+    null
+  );
+  const [sendJsonMessage, setSendJsonMessage] = useState(null); //! Almacenamos una función.
+  const [websocketReq, setWebsocketReq] = useState(false);
+
+  const { language } = useLangStore();
+  const { loading: LoadingAuth } = useAuth(); // ELIMINAR
+
+  // const isConnected = usePingChecker(AUTH_URL!);
+
+  console.log("RENDERING CHARGERS PAGE!!");
+
+  // ELIMINAR DESDE ACA:
+
+  useEffect(() => {
+    if (loading) {
+      setLoading(false);
+    }
+  }, [loading, setLoading]);
+
+  useEffect(() => {
+    if (loading === false) {
+      setTimeout(() => {
+        getChargers();
+      }, 1000);
+    }
+  }, [loading, getChargers, axios, chargers, setChargers]);
+
+  async function getChargers() {
+    const retryDelay = 5000;
+
+    while (true) {
+      try {
+        const response = await oldApi.get("/chargers/get");
+        setLoadingRequest(false);
+        setChargers(response.data);
+        return;
+      } catch (e) {
+        console.log(`Error: ${e}`);
+        setLoadingRequest(true);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
+  // HASTA ACA
+
+  // const {
+  //   data: chargers,
+  //   isLoading: isLoadingChargers,
+  //   refetch,
+  // } = useQuery({
+  //   queryKey: ["chargers"],
+  //   queryFn: async () => {
+  //     const response = await oldApi.get("/chargers/get");
+  //     return response.data;
+  //   },
+  //   refetchInterval: POLLING_INTERVAL,
+  //   refetchIntervalInBackground: true,
+  // });
+
+  function onChangeExcel(e: any) {
+    var file = e.target.files[0];
+    var formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      oldApi.post("/chargers/add/fromExcel", formData).catch((r) => {});
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  const addRef = useRef<any>(null);
+  const editRef = useRef<any>(null);
+  const cloneRef = useRef<any>(null);
+  const deleteRef = useRef<any>(null);
+
+  // const handleAddClick = () => {
+  //   if (addRef.current) {
+  //     addRef.current.click();
+  //   }
+  // };
+
+  // const handleClick = () => {
+  //   if (editRef.current) {
+  //     editRef.current.click();
+  //   }
+  // };
+
+  // const handleDeleteClick = () => {
+  //   if (deleteRef.current) {
+  //     deleteRef.current.click();
+  //   }
+  // };
+
+  // const handleCloneClick = () => {
+  //   if (cloneRef.current) {
+  //     cloneRef.current.click();
+  //   }
+  // };
+
+  const handleModalClick = (ref: any) => {
+    ref.current?.click();
+  };
+
+  // const filteredChargers = onlyOnline
+  //   ? chargers?.filter(
+  //       (charger: any) => charger.chargerStatus !== "unavailable"
+  //     )
+  //   : chargers;
+
+  // useEffect(() => {
+  //   if (isConnected) {
+  //     refetch();
+  //   }
+  // }, [isConnected]);
+
+  return (
+    <div className="flex flex-col w-full max-h-[100%] overflow-hidden h-full justify-start items-center px-0 bg-bluewhite relative">
+      <PageHeader>
+        <div className="flex flex-row items-center justify-center gap-2 max-sm:w-min">
+          <h2 className="text-[1.7rem] font-medium mr-0 max-sm:text-[1.5rem] max-sm:w-max  uppercase">
+            {t.header[language] || "MY CHARGERS"}
+          </h2>
+          <TooltipColors />
+        </div>
+
+        <div
+          className="dnRight dnRightHigh max-lg:!hidden"
+          style={{ gap: "2rem", position: "relative" }}
+        >
+          <div className="dnOnline">
+            <label htmlFor="OnlyOnline" className="dnLabel">
+              <SwitchButton
+                label={t.onlyAvaliable[language] || "ONLY AVALIABLE CHARGERS"}
+                onClick={setOnlyOnline}
+              />
+            </label>
+          </div>
+
+          <div className="flex gap-3">
+            <AddExcelButton onClick={onChangeExcel} />
+
+            <ModalTrigger
+              ref={addRef}
+              modal={<AddChargerForm key={"ASDFASDF"} />}
+            >
+              <AddChargerButton />
+            </ModalTrigger>
+          </div>
+        </div>
+
+        <MobileDropdownMenu
+          onAddFromExcel={onChangeExcel}
+          onAddCharge={() => handleModalClick(addRef)}
+          onToggleFilter={setOnlyOnline}
+          onlyOnline={onlyOnline}
+        />
+      </PageHeader>
+
+      {/* {(isLoadingChargers || !isConnected) && <PingLost />} */}
+
+      {(loadingRequest || LoadingAuth) && <PingLost />}
+
+      {/* {!isLoadingChargers && isConnected && ( */}
+      {!loadingRequest && (
+        <div
+          style={{ minHeight: "calc(100vh - 6rem)" }}
+          className={cn(
+            "flex flex-row justify-start items-start content-start flex-wrap p-8 max-sm:p-0 max-sm:pt-4 pl-16 max-sm:pl-0 max-sm:justify-center max-sm:px-4 overflow-y-auto relative rounded-[0.5rem flex-1 w-full",
+            " min-h-[76vh] rounded-none shadow-md"
+          )}
+        >
+          {/* {filteredChargers?.map((charger: any, index: any) => (
+            <Charger
+              key={index}
+              values={charger}
+              index={index}
+              onClickEdit={() => handleModalClick(editRef)}
+              onClickDelete={() => handleModalClick(deleteRef)}
+              onClickClone={() => handleModalClick(cloneRef)}
+              isEven={(index + 1) % 2 === 0}
+              selectedValues={setSelectedValues}
+              setSendJsonMessage={setSendJsonMessage}
+              sendJsonMessage={sendJsonMessage}
+              setWebsocketReq={setWebsocketReq}
+              websocketReq={websocketReq}
+            />
+          ))} */}
+          {chargers?.map((value: any, index: number) => {
+            var isEven = false;
+            if ((index + 1) % 2 === 0) {
+              isEven = true;
+            }
+
+            if (onlyOnline) {
+              if (value.chargerStatus !== "unavailable") {
+                return (
+                  <Charger
+                    values={value}
+                    index={index}
+                    key={index}
+                    onClickEdit={() => handleModalClick(editRef)}
+                    onClickDelete={() => handleModalClick(deleteRef)}
+                    onClickClone={() => handleModalClick(cloneRef)}
+                    isEven={isEven}
+                    selectedValues={setSelectedValues}
+                    setSendJsonMessage={setSendJsonMessage}
+                    sendJsonMessage={sendJsonMessage}
+                    setWebsocketReq={setWebsocketReq}
+                    websocketReq={websocketReq}
+                  />
+                );
+              } else {
+                return;
+              }
+            } else {
+              return (
+                <Charger
+                  values={value}
+                  index={index}
+                  onClickEdit={() => handleModalClick(editRef)}
+                  onClickDelete={() => handleModalClick(deleteRef)}
+                  onClickClone={() => handleModalClick(cloneRef)}
+                  key={index}
+                  isEven={isEven}
+                  selectedValues={setSelectedValues}
+                  setSendJsonMessage={setSendJsonMessage}
+                  sendJsonMessage={sendJsonMessage}
+                  setWebsocketReq={setWebsocketReq}
+                  websocketReq={websocketReq}
+                />
+              );
+            }
+          })}
+        </div>
+      )}
+
+      {selectedValues && (
+        <>
+          <ModalTrigger
+            ref={editRef}
+            modal={
+              <EditChargerForm
+                key={`${selectedValues.chargerId} - ${selectedValues.connectorId}`}
+                selectedCharger={selectedValues}
+                setSelectedCharger={setSelectedValues}
+              />
+            }
+          >
+            <div className="absolute hidden">IGNORE THIS!!</div>
+          </ModalTrigger>
+
+          <ModalTrigger
+            ref={deleteRef}
+            modal={
+              <DeleteAlertModal
+                key={selectedValues.chargerId}
+                charger={selectedValues}
+              />
+            }
+          >
+            <div className="absolute hidden">IGNORE THIS!!</div>
+          </ModalTrigger>
+
+          <ModalTrigger
+            ref={cloneRef}
+            modal={
+              <CloneChargerForm
+                key={selectedValues.chargerId}
+                selectedCharger={selectedValues}
+                setSelectedCharger={setSelectedValues}
+              />
+            }
+          >
+            <div className="absolute hidden">IGNORE THIS!!</div>
+          </ModalTrigger>
+        </>
+      )}
+      <Toaster />
+    </div>
+  );
+}
